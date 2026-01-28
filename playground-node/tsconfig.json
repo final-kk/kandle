@@ -1,0 +1,32 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "CommonJS",
+        "moduleResolution": "Node",
+        "strict": true,
+        "skipLibCheck": true,
+        "baseUrl": "..",
+        "paths": {
+            "@kandle/core": [
+                "packages/core/src/index.ts"
+            ],
+            "@kandle/backend-webgpu": [
+                "packages/backend-webgpu/src/index.ts"
+            ],
+            "@kandle/utils": [
+                "packages/utils/src/index.ts"
+            ],
+            "@kandle/types": [
+                "packages/types/src/index.ts"
+            ],
+            "@kandle/model-utils": [
+                "packages/model-utils/src/index.ts"
+            ]
+        },
+        "esModuleInterop": true,
+        "types": ["node"]
+    },
+    "include": [
+        "./**/*.ts"
+    ]
+}

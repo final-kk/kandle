@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NN-Kit WebGPU Memory Pool Test</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-yellow: #d29922;
+            --accent-blue: #58a6ff;
+            --border-color: #30363d;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h1::before {
+            content: '🧪';
+        }
+
+        .status-bar {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-label {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .status-value {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .status-value.pass {
+            color: var(--accent-green);
+        }
+
+        .status-value.fail {
+            color: var(--accent-red);
+        }
+
+        .status-value.pending {
+            color: var(--accent-yellow);
+        }
+
+        .test-suite {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .suite-header {
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .suite-header.pass::before {
+            content: '✅';
+        }
+
+        .suite-header.fail::before {
+            content: '❌';
+        }
+
+        .suite-header.running::before {
+            content: '⏳';
+        }
+
+        .test-list {
+            padding: 8px 0;
+        }
+
+        .test-item {
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+
+        .test-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .test-icon {
+            width: 18px;
+            text-align: center;
+        }
+
+        .test-icon.pass {
+            color: var(--accent-green);
+        }
+
+        .test-icon.fail {
+            color: var(--accent-red);
+        }
+
+        .test-icon.pending {
+            color: var(--accent-yellow);
+        }
+
+        .test-name {
+            flex: 1;
+        }
+
+        .test-time {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .test-error {
+            margin: 0 16px 8px 46px;
+            padding: 12px;
+            background: rgba(248, 81, 73, 0.1);
+            border-left: 3px solid var(--accent-red);
+            border-radius: 4px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            color: #ffa198;
+        }
+
+        .controls {
+            margin-bottom: 24px;
+        }
+
+        .run-button {
+            background: var(--accent-green);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .run-button:hover {
+            opacity: 0.9;
+        }
+
+        .run-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .webgpu-status {
+            padding: 16px;
+            border-radius: 6px;
+            margin-bottom: 24px;
+        }
+
+        .webgpu-status.available {
+            background: rgba(63, 185, 80, 0.1);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+
+        .webgpu-status.unavailable {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+        }
+
+        .console-output {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-top: 24px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .console-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+        }
+
+        .console-log {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .console-log .info {
+            color: var(--accent-blue);
+        }
+
+        .console-log .success {
+            color: var(--accent-green);
+        }
+
+        .console-log .error {
+            color: var(--accent-red);
+        }
+
+        .console-log .warn {
+            color: var(--accent-yellow);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>GPU Memory Pool Tests</h1>
+
+        <div id="webgpu-status" class="webgpu-status">
+            检测 WebGPU 支持中...
+        </div>
+
+        <div class="controls">
+            <button id="run-tests" class="run-button" disabled>
+                ▶ 运行测试
+            </button>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-label">总计:</span>
+                <span id="total-count" class="status-value">0</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">通过:</span>
+                <span id="pass-count" class="status-value pass">0</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">失败:</span>
+                <span id="fail-count" class="status-value fail">0</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">耗时:</span>
+                <span id="duration" class="status-value">-</span>
+            </div>
+        </div>
+
+        <div id="test-results"></div>
+
+        <div class="console-output">
+            <div class="console-title">📋 Console</div>
+            <div id="console-log" class="console-log"></div>
+        </div>
+    </div>
+
+    <script type="module" src="./tests/memory-pool/memory-pool.test.ts"></script>
+</body>
+
+</html>

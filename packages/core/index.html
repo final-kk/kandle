@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NN-Kit v7 测试控制台</title>
+    <style>
+        :root {
+            --sidebar-width: 300px;
+            --primary-color: #3b82f6;
+            --primary-hover: #2563eb;
+            --bg-color: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-color: #334155;
+            --text-muted: #64748b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: white;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.25rem;
+            color: #1e293b;
+            font-weight: 700;
+        }
+
+        .sidebar-content {
+            padding: 10px 0;
+        }
+
+        /* Tree View */
+        .tree-item {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .tree-header {
+            padding: 8px 16px;
+            font-weight: 600;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .tree-header:hover {
+            background-color: #f1f5f9;
+        }
+
+        .tree-header svg {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            transition: transform 0.2s;
+        }
+
+        .tree-children {
+            padding-left: 0;
+        }
+
+        .test-item {
+            padding: 8px 16px 8px 44px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            border-left: 3px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .test-item:hover {
+            background-color: #f8fafc;
+            color: var(--text-color);
+        }
+
+        .test-item.active {
+            background-color: #eff6ff;
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #cbd5e1;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .top-bar {
+            padding: 16px 24px;
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .test-header-info h1 {
+            font-size: 1.25rem;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .test-path {
+            font-family: 'Consolas', monospace;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .run-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .run-btn:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .run-btn:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        .status-badge.success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-badge.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-badge.loading {
+            background: #e0f2fe;
+            color: #075985;
+        }
+
+        .description-box {
+            padding: 24px;
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .description-box h3 {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .desc-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+
+        .desc-item {
+            font-size: 0.9rem;
+            color: #334155;
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-radius: 6px;
+            border: 1px solid #f1f5f9;
+        }
+
+        /* Console */
+        .console-container {
+            flex: 1;
+            background: #1e293b;
+            color: #e2e8f0;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            line-height: 1.5;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .log-group {
+            color: #a78bfa;
+            font-weight: bold;
+            margin-top: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(167, 139, 250, 0.3);
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+
+        .log-success {
+            color: #4ade80;
+        }
+
+        .log-error {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.1);
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .log-info {
+            color: #94a3b8;
+        }
+
+        .log-warn {
+            color: #fbbf24;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>NN-Kit 测试</h2>
+        </div>
+        <div class="sidebar-content" id="sidebarTree">
+            <!-- Rendered by JS -->
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Controls -->
+        <header class="top-bar">
+            <div class="test-header-info">
+                <h1 id="currentTestName">请选择测试</h1>
+                <div class="test-path" id="currentTestPath">--</div>
+            </div>
+
+            <div style="display: flex; gap: 16px; align-items: center;">
+                <div id="backendStatus" class="status-badge loading">
+                    后端初始化中...
+                </div>
+                <button id="runBtn" class="run-btn" disabled>
+                    <span class="icon">▶</span> 运行测试
+                </button>
+            </div>
+        </header>
+
+        <!-- Description -->
+        <div class="description-box">
+            <h3>测试范围简介</h3>
+            <div class="desc-list" id="descContainer">
+                <div style="color: #94a3b8; font-style: italic;">选择左侧项目查看详情...</div>
+            </div>
+        </div>
+
+        <!-- Console -->
+        <div class="console-container" id="console">
+            <!-- Logs go here -->
+        </div>
+    </main>
+
+    <script type="module">
+        import { env } from './src/index.ts';
+        import { DeviceNameEnum } from '@kandle/types';
+        import { WebGPUBackend } from '@kandle/backend-webgpu';
+
+        // --- Data Structure ---
+        const TEST_STRUCTURE = [
+            {
+                name: "Playground",
+                id: "playground",
+                children: [
+                    {
+                        name: "Playground",
+                        id: "playground",
+                        path: "./tests/playground.ts",
+                        desc: ["Playground"]
+                    }
+                ]
+            },
+            {
+                name: "基础算子 (Ops)",
+                id: "ops",
+                children: [
+                    {
+                        name: "Activation",
+                        id: "ops-pointwise",
+                        children: [
+                            {
+                                id: "nn-functional",
+                                name: "NN Functional",
+                                path: "./tests/ops/activation/nn-functional-test.ts",
+                                desc: ["Pointwise: logsigmoid", "Softmax variations", "Normalization layers"]
+                            },
+                            {
+                                id: "nn-namespace",
+                                name: "Namespace Check",
+                                path: "./tests/ops/activation/nn-functional-namespace-test.ts",
+                                desc: ["Verify nn.functional namespace", "Activation aliases"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Attention",
+                        id: "ops-attention",
+                        children: [
+                            {
+                                id: "mask-debug",
+                                name: "Causal Mask Debug",
+                                path: "./tests/ops/mask-debug-test.ts",
+                                desc: ["Verify triu / where / full logic", "Check broadcast add behavior"]
+                            },
+                            {
+                                id: "sdpa",
+                                name: "Scaled Dot-Product",
+                                path: "./tests/ops/attention/sdpa-test.ts",
+                                desc: ["F.scaled_dot_product_attention", "Causal masking", "Multi-head shape support"]
+                            },
+                            {
+                                id: "flash",
+                                name: "Flash Attention",
+                                path: "./tests/ops/attention/flash-attention-test.ts",
+                                desc: ["FlashAttention", "Causal masking", "Multi-head shape support"]
+                            },
+                            // {
+                            //     id: "causal-mask",
+                            //     name: "Causal Mask Debug",
+                            //     path: "./tests/ops/attention/causal-mask-test.ts",
+                            //     desc: ["triu/where/full 验证", "isCausal 功能测试", "无需加载模型"]
+                            // }
+                        ]
+                    },
+                    {
+                        name: "Conv & Pool",
+                        id: "ops-conv",
+                        children: [
+                            {
+                                id: "conv-basic",
+                                name: "Conv2d & Pooling",
+                                path: "./tests/ops/conv/conv-test.ts",
+                                desc: ["Im2Col implementation", "MaxPool2d / AvgPool2d", "Padding / Stride / Dilation"]
+                            },
+                            {
+                                id: "winograd",
+                                name: "Winograd Optimize",
+                                path: "./tests/ops/conv/winograd-test.ts",
+                                desc: ["F(4,3) Winograd algorithm", "3x3 convolution optimization"]
+                            },
+                            {
+                                id: "conv-advanced",
+                                name: "Advanced Conv",
+                                path: "./tests/ops/conv/conv-advanced-test.ts",
+                                desc: ["NHWC format support", "Performance comparison", "Complex input shapes"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Creation",
+                        id: "ops-creation",
+                        children: [
+                            {
+                                id: "random",
+                                name: "Random Ops",
+                                path: "./tests/ops/creation/random-test.ts",
+                                desc: ["rand / randn / randint", "Distribution checks", "Seeding"]
+                            },
+                            {
+                                id: "multinomial",
+                                name: "Multinomial",
+                                path: "./tests/ops/creation/multinomial-test.ts",
+                                desc: ["multinomial 采样", "概率分布验证", "批量采样"]
+                            },
+                            {
+                                id: "windowfunc",
+                                name: "Window Functions",
+                                path: "./tests/ops/creation/windowfunc-test.ts",
+                                desc: ["Hann/Hamming/Blackman 窗", "Bartlett/Kaiser 窗", "Periodic vs Symmetric", "精度验证 (< 1e-4)"]
+                            },
+                            {
+                                id: "fft-basic",
+                                name: "FFT 基础 (Phase 1)",
+                                path: "./tests/ops/fft/basic-fft-test.ts",
+                                desc: ["fft / ifft", "Round-trip 验证", "Parseval 定理", "归一化模式", "边界情况", "精度 < 1e-5"]
+                            },
+                            {
+                                id: "fft-real",
+                                name: "Real FFT (Phase 2)",
+                                path: "./tests/ops/fft/real-fft-test.ts",
+                                desc: ["rfft / irfft", "fftfreq / rfftfreq", "fftshift / ifftshift"]
+                            },
+                            {
+                                id: "fft2",
+                                name: "2D FFT (Phase 4)",
+                                path: "./tests/ops/fft/fft2-test.ts",
+                                desc: ["fft2 / ifft2", "rfft2 / irfft2", "2D Round-trip"]
+                            },
+                            {
+                                id: "fftn",
+                                name: "N-D FFT (Phase 5)",
+                                path: "./tests/ops/fft/fftn-test.ts",
+                                desc: ["fftn / ifftn", "rfftn / irfftn", "部分维度变换", "信号频率验证"]
+                            },
+                            {
+                                id: "hfft",
+                                name: "Hermitian FFT",
+                                path: "./tests/ops/fft/hfft-test.ts",
+                                desc: ["hfft / ihfft", "Hermitian 对称", "实数输出验证"]
+                            },
+                            {
+                                id: "bluestein",
+                                name: "Bluestein (非2^n)",
+                                path: "./tests/ops/fft/bluestein-test.ts",
+                                desc: ["非2^n长度FFT", "质数长度7/13", "往返测试", "Parseval验证"]
+                            },
+                            {
+                                id: "stft",
+                                name: "STFT (短时傅里叶)",
+                                path: "./tests/ops/fft/stft-test.ts",
+                                desc: ["STFT 分帧变换", "输出形状验证", "窗函数支持", "信号内容验证"]
+                            },
+                            {
+                                id: "fft-strided",
+                                name: "FFT 非连续内存",
+                                path: "./tests/ops/fft/strided-fft-test.ts",
+                                desc: ["Transpose 后 FFT", "Slice 后 FFT", "组合操作测试", "Strided RFFT", "2D/N-D 非连续"]
+                            },
+                            {
+                                id: "fft-corner-cases",
+                                name: "FFT Corner Cases",
+                                path: "./tests/ops/fft/corner-cases-test.ts",
+                                desc: ["极端尺寸 (N=1/2/4096)", "dtype 覆盖", "特殊数值 (大/小)", "STFT 边界", "精度验证"]
+                            },
+                            {
+                                id: "new-io",
+                                name: "I/O Architecture",
+                                path: "./tests/io/new-io-test.ts",
+                                desc: ["ByteSource 抽象层", "Safetensor Parser", "分片模型加载", "Tensor 加载"]
+                            },
+                            {
+                                id: "io-benchmark",
+                                name: "I/O Benchmark",
+                                path: "./tests/io/benchmark-test.ts",
+                                desc: ["Header 解析速度", "Tensor 加载速度", "ByteSource 读取速度"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Index Ops",
+                        id: "ops-index",
+                        children: [
+                            {
+                                id: "slice",
+                                name: "Slice",
+                                path: "./tests/ops/index_/slice-test.ts",
+                                desc: ["Python-style slicing", "View semantics", "Multi-dim slicing"]
+                            },
+                            {
+                                id: "scatter",
+                                name: "Scatter",
+                                path: "./tests/ops/index_/scatter-test.ts",
+                                desc: ["scatter / scatter_add", "scatter_reduce", "Atomic operations"]
+                            },
+                            {
+                                id: "linear-emb",
+                                name: "Linear & Embedding",
+                                path: "./tests/ops/index_/linear-embedding-test.ts",
+                                desc: ["F.linear", "F.embedding", "indexSelect"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Linear Algebra",
+                        id: "ops-linalg",
+                        children: [
+                            {
+                                id: "matrix-xform",
+                                name: "Matrix Transforms",
+                                path: "./tests/ops/linalg/matrix-transform-test.ts",
+                                desc: ["diagonal", "diag", "trace"]
+                            },
+                            {
+                                id: "copy-matmul",
+                                name: "Matmul & Copy",
+                                path: "./tests/ops/linalg/v5-copy-matrix-test.ts",
+                                desc: ["matmul / mm / bmm", "clone / contiguous", "Transposed inputs"]
+                            },
+                            {
+                                id: "matmul-comprehensive",
+                                name: "Matmul 综合测试",
+                                path: "./tests/ops/linalg/matmul-test.ts",
+                                desc: ["2D-4D 矩阵乘法", "Strided/非连续输入", "KV Cache 模式", "各种尺寸/dtype", "真正的4D BMM验证"]
+                            },
+                            {
+                                id: "complex-matmul",
+                                name: "Complex MatMul",
+                                path: "./tests/ops/linalg/complex-matmul-test.ts",
+                                desc: ["复数矩阵乘法", "complex64/complex128", "BMM/MV/Dot", "cmul 运算验证"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Memory",
+                        id: "ops-memory",
+                        children: [
+                            {
+                                id: "memory-fmt",
+                                name: "Memory Format",
+                                path: "./tests/ops/memory/memory-format-test.ts",
+                                desc: ["NCHW vs NHWC", "Stride computation", "Format conversion"]
+                            },
+                            {
+                                id: "non-contiguous-normalize",
+                                name: "Non-Contiguous Normalize",
+                                path: "./tests/ops/memory/non-contiguous-normalize-test.ts",
+                                desc: ["Softmax on transposed tensor", "RMSNorm on permuted tensor", "LayerNorm correctness", "Auto contiguous handling"]
+                            },
+                            {
+                                id: "non-contiguous-scatter",
+                                name: "Non-Contiguous Scatter/Gather",
+                                path: "./tests/ops/memory/non-contiguous-scatter-gather-test.ts",
+                                desc: ["Scatter logic on transposed tensor", "Gather (IndexSelect) on permuted tensor", "Auto contiguous handling"]
+                            },
+                            {
+                                id: "non-contiguous-triangular",
+                                name: "Non-Contiguous Triangular",
+                                path: "./tests/ops/memory/non-contiguous-triangular-test.ts",
+                                desc: ["Triu on transposed tensor", "Tril on permuted tensor", "Strided access verification", "Diagonal offset handling"]
+                            },
+                            {
+                                id: "buffer-offset",
+                                name: "Buffer Offset (Memory Pool)",
+                                path: "./tests/ops/memory/buffer-offset-test.ts",
+                                desc: ["Arena sub-buffer binding", "多Tensor隔离", "Aliasing处理", "各类kernel offset正确性", "压力测试"]
+                            },
+                            {
+                                id: "webgpu-binding-offset",
+                                name: "WebGPU Binding Offset",
+                                path: "./tests/webgpu-binding-offset-test.ts",
+                                desc: ["Static offset 透明性", "Dynamic offset 验证", "Offset 对齐要求", "hasDynamicOffsets 测试"]
+                            },
+                            {
+                                id: "dispose-test",
+                                name: "Dispose (显存释放)",
+                                path: "./tests/memory/dispose-test.ts",
+                                desc: ["GPUBuffer 立即释放", "内存增长对比", "dispose() API 验证"]
+                            },
+                            {
+                                id: "uniform-pool-ab",
+                                name: "UniformBufferPool A/B Test",
+                                path: "./tests/memory/uniform-pool-ab-test.ts",
+                                desc: ["Pool vs 直接createBuffer", "性能对比", "Buffer创建次数", "Dawn缓存验证"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Pointwise",
+                        id: "ops-basic-pw",
+                        children: [
+                            {
+                                id: "pw-webgpu",
+                                name: "Basic WebGPU",
+                                path: "./tests/ops/pointwise/v5-webgpu-test.ts",
+                                desc: ["Unary / Binary / Ternary ops", "Scalar broadcasting", "Type support"]
+                            },
+                            {
+                                id: "pw-complex",
+                                name: "Complex Nums",
+                                path: "./tests/ops/pointwise/complex-test.ts",
+                                desc: ["Complex64 / Complex128", "Real / Imag extraction", "Complex arithmetic"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Reduction",
+                        id: "ops-reduction",
+                        children: [
+                            {
+                                id: "red-advanced",
+                                name: "Advanced Reduction",
+                                path: "./tests/ops/reduction/advanced-reduction-test.ts",
+                                desc: ["logsumexp", "norm (Lp)", "triu / tril", "eye"]
+                            },
+                            {
+                                id: "welford",
+                                name: "Welford Stats",
+                                path: "./tests/ops/reduction/welford-test.ts",
+                                desc: ["variance", "std (Standard Deviation)", "Online algorithm"]
+                            },
+                            {
+                                id: "argmax-argmin",
+                                name: "Argmax/Argmin",
+                                path: "./tests/ops/reduction/argmax-argmin-test.ts",
+                                desc: ["argmax (最大值索引)", "argmin (最小值索引)", "全局归约", "维度归约"]
+                            },
+                            {
+                                id: "basic-ops-verify",
+                                name: "Basic Ops Verify",
+                                path: "./tests/ops/reduction/basic-ops-verify-test.ts",
+                                desc: ["全局 min/max/mean", "pow 二元/标量", "负数底数处理", "边界情况"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Scan",
+                        id: "ops-scan",
+                        children: [
+                            {
+                                id: "scan-ops",
+                                name: "Scan Operations",
+                                path: "./tests/ops/scan/scan-test.ts",
+                                desc: ["cumsum (Prefix Sum)", "cumprod", "cummax / cummin"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Shape Views",
+                        id: "ops-shape",
+                        children: [
+                            {
+                                id: "view",
+                                name: "View Ops",
+                                path: "./tests/ops/shape/view-test.ts",
+                                desc: ["view / reshape", "permute / transpose", "squeeze / unsqueeze", "expand"]
+                            },
+                            {
+                                id: "strided",
+                                name: "Strided Checks",
+                                path: "./tests/ops/shape/v5-strided-test.ts",
+                                desc: ["Advanced stride logic", "Contiguity verification"]
+                            },
+                            {
+                                id: "flip",
+                                name: "Flip",
+                                path: "./tests/ops/shape/flip-test.ts",
+                                desc: ["Flip 操作测试"]
+                            },
+                            {
+                                id: "repeat-interleave",
+                                name: "RepeatInterleave",
+                                path: "./tests/ops/shape/repeat-interleave-test.ts",
+                                desc: ["repeat_interleave 元素重复", "KV头扩展", "维度指定重复"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Sort",
+                        id: "ops-sort",
+                        children: [
+                            {
+                                id: "sort-ops",
+                                name: "Sort Ops",
+                                path: "./tests/ops/sort/sort-test.ts",
+                                desc: ["topk", "sort", "argsort"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Edge Cases",
+                        id: "ops-edge-cases",
+                        children: [
+                            {
+                                id: "special-values",
+                                name: "Special Values",
+                                path: "./tests/ops/edge-cases/special-values-test.ts",
+                                desc: ["NaN / Infinity / -Infinity", "Softmax 特殊值行为", "Pow 负数底数", "除0和对数边界"]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Audio Primitives",
+                        id: "ops-audio",
+                        children: [
+                            {
+                                id: "audio-primitives",
+                                name: "Audio Primitives",
+                                path: "./tests/ops/audio-primitives-test.ts",
+                                desc: ["i0 (Bessel I₀)", "atan2 (二参数反正切)", "angle (复数相位)", "sinc (归一化sinc)", "diff (前向差分)"]
+                            },
+                            {
+                                id: "audio-functional",
+                                name: "Audio Functional",
+                                path: "./tests/audio/functional-test.ts",
+                                desc: ["amplitudeToDB / DBToAmplitude", "melscaleFbanks / linearFbanks", "createDct", "spectrogram", "computeDeltas"]
+                            },
+                            {
+                                id: "audio-transforms",
+                                name: "Audio Transforms",
+                                path: "./tests/audio/transforms-test.ts",
+                                desc: ["Spectrogram / MelSpectrogram", "MFCC / LFCC", "AmplitudeToDB", "FrequencyMasking / TimeMasking"]
+                            },
+                            {
+                                id: "audio-missing-ops",
+                                name: "Audio Missing Ops",
+                                path: "./tests/ops/test-missing-ops.ts",
+                                desc: ["linspace", "fmod", "remainder"]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                name: "NN 模块 (Modules)",
+                id: "nn-root",
+                children: [
+                    {
+                        id: "nn-modules",
+                        name: "Core Modules",
+                        path: "./tests/nn/modules/module-test.ts",
+                        desc: ["nn.Module / nn.Parameter", "Containers (Sequential, ModuleList)", "Standard Layers (Linear, Norm)"]
+                    },
+                    {
+                        id: "nn-mha",
+                        name: "MultiheadAttention",
+                        path: "./tests/nn/modules/mha-test.ts",
+                        desc: ["nn.MultiheadAttention", "nn.MultiheadAttentionFast", "Integration tests"]
+                    },
+                    {
+                        id: "nn-phase4",
+                        name: "Phase 4 Modules",
+                        path: "./tests/nn/modules/phase4-test.ts",
+                        desc: ["Conv1d/2d", "MaxPool1d/2d", "AvgPool1d/2d"]
+                    },
+                    {
+                        id: "nn-rope",
+                        name: "RoPE (位置编码)",
+                        path: "./tests/rope-test.ts",
+                        desc: ["RotaryEmbedding", "applyRotaryPosEmb", "LLaMA/Qwen位置编码"]
+                    },
+                    {
+                        id: "nn-sinusoidal",
+                        name: "Sinusoidal (正弦位置编码)",
+                        path: "./tests/sinusoidal-test.ts",
+                        desc: ["SinusoidalPositionalEncoding", "Transformer原始位置编码", "批量处理/增量解码"]
+                    },
+                    {
+                        id: "cat-stack",
+                        name: "Cat/Stack (张量拼接)",
+                        path: "./tests/cat-test.ts",
+                        desc: ["torch.cat", "torch.stack", "张量合并操作"]
+                    },
+                    {
+                        id: "qwen3-model",
+                        name: "Qwen3 Model (大模型组件)",
+                        path: "./tests/nn/qwen3-test.ts",
+                        desc: ["SwiGLUMLP", "GroupedQueryAttention", "Qwen3DecoderLayer", "Qwen3Model"]
+                    },
+                    {
+                        id: "qwen3-inference",
+                        name: "Qwen3 Inference (推理验证)",
+                        path: "./tests/nn/qwen3-inference-test.ts",
+                        desc: ["真实权重加载", "BF16→F32转换", "前向推理验证", "输出正确性检查"]
+                    },
+                    {
+                        id: "qwen3-tokenizer",
+                        name: "Qwen3 Tokenizer",
+                        path: "./tests/nn/qwen3-tokenizer-test.ts",
+                        desc: ["@huggingface/tokenizers", "Encode/Decode验证", "Special Tokens处理", "Chat格式支持"]
+                    },
+                    {
+                        id: "qwen3-e2e",
+                        name: "Qwen3 E2E (端到端推理)",
+                        path: "./tests/nn/qwen3-e2e-test.ts",
+                        desc: ["完整推理流程", "Greedy生成", "Chat格式生成", "性能测试"]
+                    },
+                    {
+                        id: "qwen3-kv-cache-perf",
+                        name: "Qwen3 KV Cache Perf",
+                        path: "./tests/nn/qwen3-e2e-kv-cache-test.ts",
+                        desc: ["Separate KV Cache Test", "Optimized Loop", "Performance Profiling"]
+                    },
+                    {
+                        id: "qwen3-gpu-graph",
+                        name: "Qwen3 In-GPU Graph",
+                        path: "./tests/nn/qwen3-e2e-kv-cache-test.ts",
+                        desc: ["Queued Execution", "No CPU-GPU Sync", "Maximum Througput"]
+                    },
+                    {
+                        id: "qwen3-e2e-py",
+                        name: "Qwen3 Step-by-Step (对比Python)",
+                        path: "./tests/nn/qwen3-e2e-test-py.ts",
+                        desc: ["逐步对比PyTorch", "中间值验证", "精确定位错误层", "与qwen3_debug.py配合"]
+                    },
+                    {
+                        id: "qwen3-debug-simple",
+                        name: "Qwen3 简化调试",
+                        path: "./tests/nn/qwen3-debug-simple.ts",
+                        desc: ["隔离多Token问题", "RoPE形状验证", "SDPA独立测试", "Causal Mask验证"]
+                    }
+                ]
+            }
+        ];
+
+        // --- DOM Elements ---
+        const treeRoot = document.getElementById('sidebarTree');
+        const consoleEl = document.getElementById('console');
+        const backendStatusEl = document.getElementById('backendStatus');
+        const runBtn = document.getElementById('runBtn');
+        const currentTestNameEl = document.getElementById('currentTestName');
+        const currentTestPathEl = document.getElementById('currentTestPath');
+        const descContainer = document.getElementById('descContainer');
+
+        let activeTestId = null;
+        let activeTestPath = null;
+
+        // --- UI Logic ---
+
+        function renderTree(items, container) {
+            items.forEach(item => {
+                const isFolder = item.children && item.children.length > 0;
+
+                const div = document.createElement('div');
+                div.className = 'tree-item';
+
+                if (isFolder) {
+                    const header = document.createElement('div');
+                    header.className = 'tree-header';
+                    header.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                        ${item.name}
+                    `;
+                    div.appendChild(header);
+
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'tree-children';
+                    renderTree(item.children, childrenContainer);
+                    div.appendChild(childrenContainer);
+                } else {
+                    div.className = 'test-item';
+                    div.dataset.id = item.id;
+                    div.dataset.path = item.path;
+                    div.dataset.name = item.name;
+                    div.dataset.desc = JSON.stringify(item.desc || []);
+                    div.innerHTML = `
+                        <span>${item.name}</span>
+                        <div class="status-dot"></div>
+                    `;
+                    div.onclick = (e) => selectTest(item, div, e);
+                }
+
+                container.appendChild(div);
+            });
+        }
+
+        function selectTest(data, element, event) {
+            event.stopPropagation();
+
+            // UI Update
+            document.querySelectorAll('.test-item.active').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+
+            activeTestId = data.id;
+            activeTestPath = data.path;
+
+            // Header Update
+            currentTestNameEl.textContent = data.name;
+            currentTestPathEl.textContent = data.path;
+
+            // Desc Update
+            descContainer.innerHTML = '';
+            const descs = data.desc || [];
+            if (descs.length === 0) {
+                descContainer.innerHTML = '<div style="color:#cbd5e1">暂无详细描述</div>';
+            } else {
+                descs.forEach(d => {
+                    const tag = document.createElement('div');
+                    tag.className = 'desc-item';
+                    tag.textContent = d;
+                    descContainer.appendChild(tag);
+                });
+            }
+
+            // Enable Run if backend ready
+            if (backendStatusEl.classList.contains('success')) {
+                runBtn.disabled = false;
+            }
+        }
+
+        // --- Logging & Output ---
+
+        function logger(msg, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = msg;
+            consoleEl.appendChild(entry);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        window.testLogger = {
+            log: (msg) => logger(msg, 'info'),
+            logGroup: (title) => logger(`\n━━━━━ ${title} ━━━━━`, 'group'),
+            info: (msg) => logger(msg, 'info'),
+            success: (msg) => logger(msg, 'success'),
+            error: (msg) => logger(msg, 'error'),
+            warn: (msg) => logger(msg, 'warn')
+        };
+
+        // --- Init ---
+
+        async function init() {
+            renderTree(TEST_STRUCTURE, treeRoot);
+
+            // Check WebGPU & Init Backend
+            if (!navigator.gpu) {
+                backendStatusEl.className = 'status-badge error';
+                backendStatusEl.textContent = 'WebGPU 不可用';
+                return;
+            }
+
+            try {
+                if (!env.globalBackend) {
+                    const backend = await WebGPUBackend.create();
+                    env.setBackend(backend);
+                    env.setDefaultDevice(DeviceNameEnum.WebGPU);
+                }
+
+                backendStatusEl.className = 'status-badge success';
+                backendStatusEl.textContent = 'Backend 就绪';
+
+                if (activeTestId) {
+                    runBtn.disabled = false;
+                }
+            } catch (e) {
+                backendStatusEl.className = 'status-badge error';
+                backendStatusEl.textContent = '初始化失败';
+                logger(`Init Error: ${e.message}`, 'error');
+                console.error(e);
+            }
+        }
+
+        // --- Run Handler ---
+
+        runBtn.onclick = async () => {
+            if (!activeTestPath) return;
+
+            runBtn.disabled = true;
+            runBtn.innerHTML = '<div class="spinner"></div> 运行中...';
+            consoleEl.innerHTML = ''; // Clear logs
+
+            logger(`正在加载测试模块: ${activeTestPath}...`);
+
+            try {
+                // Dynamic Import
+                const module = await import(/* @vite-ignore */ activeTestPath);
+
+                if (module.runAllTests) {
+                    logger(`开始执行: ${currentTestNameEl.textContent}`, 'group');
+                    await module.runAllTests();
+                    logger('\n测试执行完毕', 'success');
+                } else {
+                    logger('错误: 未找到 runAllTests 导出函数', 'error');
+                }
+
+            } catch (e) {
+                logger(`执行错误: ${e.message}`, 'error');
+                console.error(e);
+            } finally {
+                runBtn.disabled = false;
+                runBtn.innerHTML = '<span class="icon">▶</span> 再次运行';
+            }
+        };
+
+        // Start
+        init();
+
+    </script>
+</body>
+
+</html>

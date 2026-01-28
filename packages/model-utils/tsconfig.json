@@ -1,0 +1,39 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "outDir": "dist",
+        "rootDir": "src",
+        "baseUrl": ".",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "paths": {
+            "@/*": [
+                "src/*"
+            ],
+            "@kandle/core": [
+                "../core/src/index.ts"
+            ],
+            "@kandle/types": [
+                "../types/src/index.ts"
+            ],
+            "@kandle/backend-webgpu": [
+                "../backend-webgpu/src/index.ts"
+            ],
+            "@kandle/utils": [
+                "../utils/src/index.ts"
+            ]
+        },
+        "composite": true
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "references": [
+        {
+            "path": "../core"
+        },
+        {
+            "path": "../types"
+        }
+    ]
+}

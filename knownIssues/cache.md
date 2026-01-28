@@ -1,0 +1,1 @@
+- pipelinekey => 保证顺序的json.stringfy, 根据KernelParams 统一构造?

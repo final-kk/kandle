@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-cyber-cyan: #00f5ff;
+    --color-cyber-purple: #bf00ff;
+    --color-cyber-pink: #ff00aa;
+    --color-cyber-green: #00ff88;
+    --color-cyber-orange: #ff6600;
+  }
+
+  body {
+    @apply bg-gray-950 text-gray-100;
+    background-image:
+      radial-gradient(ellipse at top, rgba(0, 245, 255, 0.05), transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(191, 0, 255, 0.05), transparent 50%);
+    min-height: 100vh;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-700 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-600;
+  }
+}
+
+@layer components {
+  /* Cyber glow effects */
+  .glow-cyan {
+    box-shadow: 0 0 10px rgba(0, 245, 255, 0.3),
+                0 0 20px rgba(0, 245, 255, 0.2),
+                inset 0 0 10px rgba(0, 245, 255, 0.1);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 10px rgba(191, 0, 255, 0.3),
+                0 0 20px rgba(191, 0, 255, 0.2),
+                inset 0 0 10px rgba(191, 0, 255, 0.1);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3),
+                0 0 20px rgba(0, 255, 136, 0.2),
+                inset 0 0 10px rgba(0, 255, 136, 0.1);
+  }
+
+  /* Panel styling */
+  .panel {
+    @apply bg-gray-900/80 backdrop-blur-sm border border-gray-800 rounded-lg;
+  }
+
+  .panel-header {
+    @apply px-4 py-2 border-b border-gray-800 font-mono text-sm text-cyber-cyan uppercase tracking-wider;
+  }
+
+  /* Terminal-style log */
+  .terminal-log {
+    @apply font-mono text-xs leading-relaxed;
+  }
+
+  .terminal-log .log-info {
+    @apply text-gray-400;
+  }
+
+  .terminal-log .log-success {
+    @apply text-cyber-green;
+  }
+
+  .terminal-log .log-warning {
+    @apply text-cyber-orange;
+  }
+
+  .terminal-log .log-error {
+    @apply text-red-400;
+  }
+
+  .terminal-log .log-debug {
+    @apply text-cyber-purple;
+  }
+
+  .terminal-log .log-kernel {
+    @apply text-cyber-cyan;
+  }
+
+  /* Cyber button */
+  .btn-cyber {
+    @apply relative px-4 py-2 font-mono text-sm uppercase tracking-wider
+           bg-transparent border border-cyber-cyan text-cyber-cyan
+           hover:bg-cyber-cyan/10 transition-all duration-300
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-cyber::before {
+    content: '';
+    @apply absolute inset-0 bg-cyber-cyan/5;
+  }
+
+  .btn-cyber:hover:not(:disabled) {
+    box-shadow: 0 0 15px rgba(0, 245, 255, 0.3);
+  }
+
+  .btn-cyber-primary {
+    @apply btn-cyber bg-cyber-cyan/10;
+  }
+
+  /* Input styling */
+  .input-cyber {
+    @apply w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded
+           text-gray-100 font-mono text-sm
+           focus:outline-none focus:border-cyber-cyan focus:ring-1 focus:ring-cyber-cyan/50
+           placeholder:text-gray-600;
+  }
+
+  /* Progress bar */
+  .progress-cyber {
+    @apply h-2 bg-gray-800 rounded-full overflow-hidden;
+  }
+
+  .progress-cyber-bar {
+    @apply h-full bg-gradient-to-r from-cyber-cyan to-cyber-purple transition-all duration-300;
+  }
+
+  /* Grid background */
+  .bg-grid {
+    background-size: 40px 40px;
+    background-image:
+      linear-gradient(to right, rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply p-3 bg-gray-800/50 border border-gray-700 rounded;
+  }
+
+  .stat-label {
+    @apply text-xs text-gray-500 uppercase tracking-wider;
+  }
+
+  .stat-value {
+    @apply text-lg font-mono text-cyber-cyan;
+  }
+
+  /* Tab styling */
+  .tab-item {
+    @apply px-4 py-2 font-mono text-sm uppercase tracking-wider
+           text-gray-500 border-b-2 border-transparent
+           hover:text-gray-300 transition-colors cursor-pointer;
+  }
+
+  .tab-item.active {
+    @apply text-cyber-cyan border-cyber-cyan;
+  }
+
+  /* Dropdown zone */
+  .drop-zone {
+    @apply border-2 border-dashed border-gray-700 rounded-lg p-8
+           flex flex-col items-center justify-center gap-4
+           transition-all duration-300 cursor-pointer;
+  }
+
+  .drop-zone:hover,
+  .drop-zone.drag-over {
+    @apply border-cyber-cyan bg-cyber-cyan/5;
+  }
+
+  /* Animation helpers */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Code/tensor display */
+  .tensor-display {
+    @apply font-mono text-xs bg-gray-900 p-2 rounded border border-gray-800 overflow-auto;
+  }
+
+  /* Visualization container */
+  .vis-container {
+    @apply relative bg-gray-900/50 border border-gray-800 rounded overflow-hidden;
+  }
+
+  .vis-container canvas {
+    @apply w-full h-full;
+  }
+}
+
+@layer utilities {
+  .text-gradient-cyber {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-cyber-cyan via-cyber-purple to-cyber-pink;
+  }
+}

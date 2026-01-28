@@ -1,0 +1,38 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "outDir": "dist",
+        "composite": true,
+        "declaration": true,
+        "stripInternal": true,
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "lib": [
+            "DOM",
+            "DOM.Iterable",
+            "ESNext"
+        ],
+        "types": [
+            "@webgpu/types"
+        ],
+        "baseUrl": "."
+    },
+    "include": [
+        "src/**/*",
+        "tests"
+    ],
+    "references": [
+        {
+            "path": "../types"
+        },
+        {
+            "path": "../utils"
+        },
+        {
+            "path": "../backend-webgpu"
+        },
+        {
+            "path": "../model-utils"
+        }
+    ]
+}

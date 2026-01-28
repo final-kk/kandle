@@ -1,0 +1,44 @@
+{
+    "compilerOptions": {
+        "target": "ES2020",
+        "useDefineForClassFields": true,
+        "module": "ESNext",
+        "lib": [
+            "ES2020",
+            "DOM",
+            "DOM.Iterable"
+        ],
+        "skipLibCheck": true,
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "noEmit": true,
+        "strict": true,
+        "baseUrl": "..",
+        "paths": {
+            "@kandle/core": [
+                "packages/core/src/index.ts"
+            ],
+            "@kandle/backend-webgpu": [
+                "packages/backend-webgpu/src/index.ts"
+            ],
+            "@kandle/utils": [
+                "packages/utils/src/index.ts"
+            ],
+            "@kandle/types": [
+                "packages/types/src/index.ts"
+            ],
+            "@kandle/model-utils": [
+                "packages/model-utils/src/index.ts"
+            ]
+        },
+        "types": [
+            "@webgpu/types"
+        ]
+    },
+    "include": [
+        "./**/*.ts",
+        "./**/*.tsx"
+    ]
+}

@@ -1,0 +1,23 @@
+{
+    "name": "playground-web",
+    "version": "0.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "@kandle/core": "workspace:*",
+        "@kandle/backend-webgpu": "workspace:*",
+        "@kandle/utils": "workspace:*",
+        "@kandle/types": "workspace:*",
+        "@kandle/model-utils": "workspace:*",
+        "@huggingface/tokenizers": "^0.0.6"
+    },
+    "devDependencies": {
+        "typescript": "^5.3.3",
+        "vite": "^5.0.0",
+        "@webgpu/types": "^0.1.68"
+    }
+}

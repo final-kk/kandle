@@ -1,0 +1,77 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+.packed/
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+.cache/
+.temp/
+
+# Debug
+bug/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# C++ build artifacts (for backend-napi)
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Package manager lock files (keep pnpm-lock.yaml)
+# pnpm-lock.yaml is kept for reproducible builds
+package-lock.json
+yarn.lock
+packages/core/tests/_deps/
+packages/core/tests/build/
+
+.vibe/
+.history/
+.github/
+.logs/
+.input/
+models/
+packages/nn-kit/public/
