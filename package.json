@@ -7,7 +7,7 @@
         "test": "pnpm -r run test",
         "format": "prettier --write \"**/*.{ts,js,tsx,jsx,json,md}\"",
         "format:check": "prettier --check \"**/*.{ts,js,tsx,jsx,json,md}\"",
-        "codegen": "npx tsx ./scripts/codegen/index.ts",
+        "codegen": "npx tsx ./scripts/codegen/index.ts"
     },
     "devDependencies": {
         "@types/node": "^20.11.0",
