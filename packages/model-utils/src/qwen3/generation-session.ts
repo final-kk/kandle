@@ -35,6 +35,16 @@ export interface LogitLensConfig {
 }
 
 /**
+ * Attention 可视化配置
+ */
+export interface AttentionConfig {
+    /** 是否启用 */
+    enabled: boolean;
+    /** 需要捕获 attention weights 的层索引 */
+    layerIndices: number[];
+}
+
+/**
  * 单层的 Logit Lens 预测结果
  */
 export interface LayerPrediction {
@@ -44,6 +54,26 @@ export interface LayerPrediction {
     topKTokenIds: number[];
     /** Top-K 概率 */
     topKProbs: Float32Array;
+}
+
+/**
+ * 单层的 Attention Weights 数据
+ */
+export interface LayerAttentionData {
+    /** 层索引 */
+    layerIndex: number;
+    /**
+     * Attention weights 数据 (Float32Array)
+     * 形状: [numHeads, querySeqLen, keySeqLen]
+     * 扁平化存储，使用 Transferable 传输
+     */
+    weights: Float32Array;
+    /** 头数量 */
+    numHeads: number;
+    /** Query 序列长度 */
+    querySeqLen: number;
+    /** Key 序列长度 */
+    keySeqLen: number;
 }
 
 /**
@@ -71,6 +101,11 @@ export interface GenerationSessionConfig extends SamplerConfig {
      * Logit Lens 配置
      */
     logitLens?: LogitLensConfig;
+
+    /**
+     * Attention 可视化配置
+     */
+    attention?: AttentionConfig;
 }
 
 /**
@@ -103,6 +138,9 @@ export interface SessionGenerationStep {
 
     /** Logit Lens 各层预测结果 (可选) */
     logitLens?: LayerPrediction[];
+
+    /** 各层 Attention Weights 数据 (可选) */
+    attentionData?: LayerAttentionData[];
 }
 
 /**
@@ -120,6 +158,10 @@ const DEFAULT_SESSION_CONFIG: Required<GenerationSessionConfig> = {
         enabled: false,
         layerIndices: [],
         topK: 3,
+    },
+    attention: {
+        enabled: false,
+        layerIndices: [],
     },
 };
 
@@ -180,6 +222,9 @@ export class GenerationSession {
     /** 当前位置各层的 logits (用于 Logit Lens) */
     private currentLayerLogits: Map<number, Tensor> | null = null;
 
+    /** 当前位置各层的 attention weights */
+    private currentLayerAttention: Map<number, Tensor> | null = null;
+
     /** 当前步骤的采样结果 (缓存) */
     private currentSampleResult: SampleResult | null = null;
 
@@ -215,21 +260,26 @@ export class GenerationSession {
 
         const logitLensEnabled =
             this.config.logitLens.enabled && this.config.logitLens.layerIndices.length > 0;
+        const attentionEnabled =
+            this.config.attention.enabled && this.config.attention.layerIndices.length > 0;
 
         let logits: Tensor;
         let layerLogits: Map<number, Tensor> | undefined;
+        let layerAttentionWeights: Map<number, Tensor> | undefined;
         let newCachePosition: number;
 
-        if (logitLensEnabled) {
-            // 使用带 Logit Lens 的前向传播
-            const result = await this.model.forwardWithLogitLens(
+        if (logitLensEnabled || attentionEnabled) {
+            // 使用带 Logit Lens 和/或 Attention 的前向传播
+            const result = await this.model.forwardWithLogitLensAndAttention(
                 this.inputIds,
                 this.kvCache,
                 0,
-                this.config.logitLens.layerIndices
+                logitLensEnabled ? this.config.logitLens.layerIndices : [],
+                attentionEnabled ? this.config.attention.layerIndices : []
             );
             logits = result.logits;
             layerLogits = result.layerLogits;
+            layerAttentionWeights = result.layerAttentionWeights;
             newCachePosition = result.newCachePosition;
         } else {
             // 普通前向传播
@@ -259,6 +309,18 @@ export class GenerationSession {
                 lastPosView.dispose();
                 this.currentLayerLogits.set(layerIdx, lastPos);
                 layerLogit.dispose();
+            }
+        }
+
+        // 处理各层 attention weights
+        // Prefill 阶段: attention shape 为 [batch, numHeads, seqLen, seqLen]
+        if (layerAttentionWeights && layerAttentionWeights.size > 0) {
+            this.disposeLayerAttention();
+            this.currentLayerAttention = new Map();
+            for (const [layerIdx, attnTensor] of layerAttentionWeights) {
+                // 保留完整的 attention 矩阵（不只是最后一行）
+                // 因为 prefill 阶段我们需要看完整的 [seqLen, seqLen] attention
+                this.currentLayerAttention.set(layerIdx, attnTensor);
             }
         }
 
@@ -323,21 +385,26 @@ export class GenerationSession {
 
         const logitLensEnabled =
             this.config.logitLens.enabled && this.config.logitLens.layerIndices.length > 0;
+        const attentionEnabled =
+            this.config.attention.enabled && this.config.attention.layerIndices.length > 0;
 
         let logits: Tensor;
         let layerLogits: Map<number, Tensor> | undefined;
+        let layerAttentionWeights: Map<number, Tensor> | undefined;
         let newCachePosition: number;
 
-        if (logitLensEnabled) {
-            // 使用带 Logit Lens 的前向传播
-            const result = await this.model.forwardWithLogitLens(
+        if (logitLensEnabled || attentionEnabled) {
+            // 使用带 Logit Lens 和/或 Attention 的前向传播
+            const result = await this.model.forwardWithLogitLensAndAttention(
                 nextInput,
                 this.kvCache,
                 this.cachePosition,
-                this.config.logitLens.layerIndices
+                logitLensEnabled ? this.config.logitLens.layerIndices : [],
+                attentionEnabled ? this.config.attention.layerIndices : []
             );
             logits = result.logits;
             layerLogits = result.layerLogits;
+            layerAttentionWeights = result.layerAttentionWeights;
             newCachePosition = result.newCachePosition;
         } else {
             // 普通前向传播
@@ -371,6 +438,17 @@ export class GenerationSession {
                 lastPosView.dispose();
                 this.currentLayerLogits.set(layerIdx, lastPos);
                 layerLogit.dispose();
+            }
+        }
+
+        // 处理各层 attention weights
+        // Decode 阶段: attention shape 为 [batch, numHeads, 1, currentSeqLen]
+        if (layerAttentionWeights && layerAttentionWeights.size > 0) {
+            this.disposeLayerAttention();
+            this.currentLayerAttention = new Map();
+            for (const [layerIdx, attnTensor] of layerAttentionWeights) {
+                // 保留完整的 attention 矩阵
+                this.currentLayerAttention.set(layerIdx, attnTensor);
             }
         }
 
@@ -435,22 +513,27 @@ export class GenerationSession {
 
         const logitLensEnabled =
             this.config.logitLens.enabled && this.config.logitLens.layerIndices.length > 0;
+        const attentionEnabled =
+            this.config.attention.enabled && this.config.attention.layerIndices.length > 0;
 
         let logits: Tensor;
         let layerLogits: Map<number, Tensor> | undefined;
+        let layerAttentionWeights: Map<number, Tensor> | undefined;
         let newCachePosition: number;
 
         // 注意：这里需要使用 targetPosition - 1 作为起始位置
         // 因为我们要重新写入这个 token 的 KV
-        if (logitLensEnabled) {
-            const result = await this.model.forwardWithLogitLens(
+        if (logitLensEnabled || attentionEnabled) {
+            const result = await this.model.forwardWithLogitLensAndAttention(
                 input,
                 this.kvCache,
                 targetPosition - 1,
-                this.config.logitLens.layerIndices
+                logitLensEnabled ? this.config.logitLens.layerIndices : [],
+                attentionEnabled ? this.config.attention.layerIndices : []
             );
             logits = result.logits;
             layerLogits = result.layerLogits;
+            layerAttentionWeights = result.layerAttentionWeights;
             newCachePosition = result.newCachePosition;
         } else {
             const result = await this.model.forwardWithKVCache(
@@ -480,6 +563,15 @@ export class GenerationSession {
                 lastPosView.dispose();
                 this.currentLayerLogits.set(layerIdx, lastPos);
                 layerLogit.dispose();
+            }
+        }
+
+        // 处理各层 attention weights
+        if (layerAttentionWeights && layerAttentionWeights.size > 0) {
+            this.disposeLayerAttention();
+            this.currentLayerAttention = new Map();
+            for (const [layerIdx, attnTensor] of layerAttentionWeights) {
+                this.currentLayerAttention.set(layerIdx, attnTensor);
             }
         }
 
@@ -516,6 +608,7 @@ export class GenerationSession {
      */
     dispose(): void {
         this.disposeCurrentLogits();
+        this.disposeLayerAttention();
         this.kvCache.dispose();
         this.initialized = false;
         this.finished = true;
@@ -555,6 +648,12 @@ export class GenerationSession {
             logitLensResults = await this.computeLogitLensPredictions();
         }
 
+        // 处理 Attention 数据
+        let attentionDataResults: LayerAttentionData[] | undefined;
+        if (this.currentLayerAttention && this.currentLayerAttention.size > 0) {
+            attentionDataResults = await this.extractAttentionData();
+        }
+
         return {
             tokenId: this.currentSampleResult.tokenId,
             logProb: this.currentSampleResult.logProb,
@@ -565,7 +664,52 @@ export class GenerationSession {
             generatedCount: this.generatedTokenIds.length,
             canUndo: this.generatedTokenIds.length > 0,
             logitLens: logitLensResults,
+            attentionData: attentionDataResults,
         };
+    }
+
+    /**
+     * 提取 Attention 数据并转换为可传输格式
+     */
+    private async extractAttentionData(): Promise<LayerAttentionData[]> {
+        if (!this.currentLayerAttention) {
+            return [];
+        }
+
+        const results: LayerAttentionData[] = [];
+
+        // 按层索引排序
+        const sortedLayers = Array.from(this.currentLayerAttention.entries()).sort(
+            (a, b) => a[0] - b[0]
+        );
+
+        for (const [layerIndex, attnTensor] of sortedLayers) {
+            // 形状: [batch, numHeads, querySeqLen, keySeqLen]
+            const shape = attnTensor.shape;
+            const numHeads = shape[1];
+            const querySeqLen = shape[2];
+            const keySeqLen = shape[3];
+
+            // 读取数据到 CPU (异步)
+            const rawData = await attnTensor.dataAsync();
+
+            // 转换为 Float32Array (移除 batch 维度)
+            // 从 [1, numHeads, qLen, kLen] -> [numHeads, qLen, kLen]
+            const weights =
+                rawData instanceof Float32Array
+                    ? rawData.slice(0, numHeads * querySeqLen * keySeqLen)
+                    : new Float32Array(rawData.slice(0, numHeads * querySeqLen * keySeqLen) as ArrayLike<number>);
+
+            results.push({
+                layerIndex,
+                weights,
+                numHeads,
+                querySeqLen,
+                keySeqLen,
+            });
+        }
+
+        return results;
     }
 
     /**
@@ -623,21 +767,26 @@ export class GenerationSession {
 
         const logitLensEnabled =
             this.config.logitLens.enabled && this.config.logitLens.layerIndices.length > 0;
+        const attentionEnabled =
+            this.config.attention.enabled && this.config.attention.layerIndices.length > 0;
 
         let logits: Tensor;
         let layerLogits: Map<number, Tensor> | undefined;
+        let layerAttentionWeights: Map<number, Tensor> | undefined;
         let newCachePosition: number;
 
         // 重新 prefill
-        if (logitLensEnabled) {
-            const result = await this.model.forwardWithLogitLens(
+        if (logitLensEnabled || attentionEnabled) {
+            const result = await this.model.forwardWithLogitLensAndAttention(
                 this.inputIds,
                 this.kvCache,
                 0,
-                this.config.logitLens.layerIndices
+                logitLensEnabled ? this.config.logitLens.layerIndices : [],
+                attentionEnabled ? this.config.attention.layerIndices : []
             );
             logits = result.logits;
             layerLogits = result.layerLogits;
+            layerAttentionWeights = result.layerAttentionWeights;
             newCachePosition = result.newCachePosition;
         } else {
             const result = await this.model.forwardWithKVCache(this.inputIds, this.kvCache, 0);
@@ -666,6 +815,15 @@ export class GenerationSession {
             }
         }
 
+        // 处理各层 attention weights
+        if (layerAttentionWeights && layerAttentionWeights.size > 0) {
+            this.disposeLayerAttention();
+            this.currentLayerAttention = new Map();
+            for (const [layerIdx, attnTensor] of layerAttentionWeights) {
+                this.currentLayerAttention.set(layerIdx, attnTensor);
+            }
+        }
+
         // 采样
         return this.sampleAndBuildStep();
     }
@@ -679,8 +837,9 @@ export class GenerationSession {
             this.currentLogits = null;
         }
         this.currentSampleResult = null;
-        // 同时释放 layer logits
+        // 同时释放 layer logits 和 attention
         this.disposeLayerLogits();
+        this.disposeLayerAttention();
     }
 
     /**
@@ -692,6 +851,18 @@ export class GenerationSession {
                 tensor.dispose();
             }
             this.currentLayerLogits = null;
+        }
+    }
+
+    /**
+     * 释放各层 attention weights
+     */
+    private disposeLayerAttention(): void {
+        if (this.currentLayerAttention) {
+            for (const tensor of this.currentLayerAttention.values()) {
+                tensor.dispose();
+            }
+            this.currentLayerAttention = null;
         }
     }
 }

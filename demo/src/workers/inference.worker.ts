@@ -35,8 +35,33 @@ let modelHandler: ModelHandler | null = null;
 // 消息发送工具
 // ============================================================================
 
-function post(event: WorkerEvent): void {
-    self.postMessage(event);
+function post(event: WorkerEvent, transferables?: Transferable[]): void {
+    if (transferables && transferables.length > 0) {
+        self.postMessage(event, transferables);
+    } else {
+        self.postMessage(event);
+    }
+}
+
+/**
+ * 发送包含 attention 数据的事件，使用 Transferable 优化
+ */
+function postWithAttention(event: WorkerEvent): void {
+    const transferables: Transferable[] = [];
+
+    // 检查是否有 attention 数据需要 transfer
+    if (event.type === "generationStep" || event.type === "undoComplete") {
+        const step = event.payload;
+        if (step.attentionData && step.attentionData.length > 0) {
+            for (const layer of step.attentionData) {
+                if (layer.weights && layer.weights.buffer) {
+                    transferables.push(layer.weights.buffer);
+                }
+            }
+        }
+    }
+
+    post(event, transferables);
 }
 
 function postError(operation: string, error: unknown): void {
@@ -137,7 +162,7 @@ async function handleStartGeneration(payload: StartGenerationPayload): Promise<v
     const firstStep = await modelHandler.startGeneration(payload);
 
     // 发送第一步预测结果，等待主线程调用 step
-    post({ type: "generationStep", payload: firstStep });
+    postWithAttention({ type: "generationStep", payload: firstStep });
 }
 
 async function handleStep(payload?: StepPayload): Promise<void> {
@@ -148,7 +173,7 @@ async function handleStep(payload?: StepPayload): Promise<void> {
     const step = await modelHandler.step(payload?.overrideTokenId);
 
     if (step) {
-        post({ type: "generationStep", payload: step });
+        postWithAttention({ type: "generationStep", payload: step });
 
         if (step.isEos) {
             post({ type: "generationComplete" });
@@ -166,7 +191,7 @@ async function handleUndo(): Promise<void> {
     const step = await modelHandler.undo();
 
     if (step) {
-        post({ type: "undoComplete", payload: step });
+        postWithAttention({ type: "undoComplete", payload: step });
     } else {
         post({ type: "undoFailed", payload: { reason: "Cannot undo further" } });
     }

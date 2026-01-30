@@ -97,6 +97,16 @@ export interface Qwen3DecoderLayerForwardOptions {
 
     /** 缓存起始位置 (从 GQA 透传) */
     cachePosition?: number;
+
+    /**
+     * 是否捕获 attention weights (透传到 GQA)
+     *
+     * 开启后可通过 self_attn.lastAttentionWeights 获取
+     * 形状: [batch, numHeads, querySeqLen, keySeqLen]
+     *
+     * @default false
+     */
+    captureAttentionWeights?: boolean;
 }
 
 // ============================================================================
@@ -182,7 +192,14 @@ export class Qwen3DecoderLayer extends nn.Module {
         hiddenStates: Tensor,
         options?: Qwen3DecoderLayerForwardOptions
     ): Promise<Tensor> {
-        const { positionEmbeddings, attnMask, isCausal = true, kvCacheUpdateFn, cachePosition } = options ?? {};
+        const {
+            positionEmbeddings,
+            attnMask,
+            isCausal = true,
+            kvCacheUpdateFn,
+            cachePosition,
+            captureAttentionWeights = false,
+        } = options ?? {};
 
         // ==========================================
         // Self-Attention Block (Pre-Norm)
@@ -199,6 +216,7 @@ export class Qwen3DecoderLayer extends nn.Module {
             isCausal,
             kvCacheUpdateFn,
             cachePosition,
+            captureAttentionWeights,
         };
         const attnOutput = await this.self_attn.call(normed1, attnOptions) as Tensor;
 

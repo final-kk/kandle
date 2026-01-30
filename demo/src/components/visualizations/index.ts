@@ -1,7 +1,8 @@
 export { Heatmap } from "./Heatmap";
 export { FeatureMap } from "./FeatureMap";
 export { AttentionVis } from "./AttentionVis";
-export { AttentionLinks } from "./AttentionLinks";
+export { AttentionLinks, HeatmapView } from "./AttentionLinks";
+export type { AttentionData, HeadSelection, AttentionLinksProps, HeatmapViewProps } from "./AttentionLinks";
 export { MelSpectrogramVis } from "./MelSpectrogramVis";
 export { TokenProbsHUD } from "./TokenProbsHUD";
 export { TextStream } from "./TextStream";

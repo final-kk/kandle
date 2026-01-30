@@ -42,6 +42,8 @@ export interface StartGenerationPayload {
     eosTokenIds: number[];
     /** Logit Lens 配置 */
     logitLens?: LogitLensConfig;
+    /** Attention 可视化配置 */
+    attention?: AttentionConfig;
 }
 
 /** Logit Lens 配置 */
@@ -52,6 +54,14 @@ export interface LogitLensConfig {
     layerIndices: number[];
     /** 每层返回的 top-k 数量 */
     topK: number;
+}
+
+/** Attention 可视化配置 */
+export interface AttentionConfig {
+    /** 是否启用 */
+    enabled: boolean;
+    /** 需要捕获 attention weights 的层索引 */
+    layerIndices: number[];
 }
 
 /** 单步生成配置 */
@@ -112,6 +122,29 @@ export interface GenerationStep {
     canUndo: boolean;
     /** Logit Lens 各层预测结果 */
     logitLens?: LayerPrediction[];
+    /** 各层 Attention Weights 数据 */
+    attentionData?: LayerAttentionData[];
+}
+
+/**
+ * 单层的 Attention Weights 数据
+ * 设计为 Transferable 友好格式
+ */
+export interface LayerAttentionData {
+    /** 层索引 */
+    layerIndex: number;
+    /**
+     * Attention weights 数据 (Float32Array)
+     * 形状: [numHeads, querySeqLen, keySeqLen]
+     * 扁平化存储，使用 Transferable 传输
+     */
+    weights: Float32Array;
+    /** 头数量 */
+    numHeads: number;
+    /** Query 序列长度 */
+    querySeqLen: number;
+    /** Key 序列长度 */
+    keySeqLen: number;
 }
 
 /** 单层的 Logit Lens 预测结果 */

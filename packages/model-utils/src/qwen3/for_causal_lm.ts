@@ -257,6 +257,69 @@ export class Qwen3ForCausalLM extends nn.Module {
     }
 
     /**
+     * 使用 KV Cache 进行一步推理，同时收集 Logit Lens 和 Attention Weights
+     *
+     * @param inputIds - 输入 token IDs，形状 [batch_size, seq_len]
+     * @param kvCache - KV Cache 实例
+     * @param cachePosition - 当前缓存位置
+     * @param collectLayerIndices - 需要收集 Logit Lens 的层索引
+     * @param collectAttentionLayers - 需要捕获 attention weights 的层索引
+     * @returns logits、各层 logits、各层 attention weights 和新的缓存位置
+     */
+    async forwardWithLogitLensAndAttention(
+        inputIds: Tensor,
+        kvCache: StaticKVCache,
+        cachePosition: number,
+        collectLayerIndices: number[],
+        collectAttentionLayers: number[]
+    ): Promise<{
+        logits: Tensor;
+        layerLogits: Map<number, Tensor>;
+        layerAttentionWeights: Map<number, Tensor>;
+        newCachePosition: number;
+    }> {
+        // 使用带层输出和 attention 收集的前向传播
+        const { hiddenStates, layerHiddenStates, layerAttentionWeights } =
+            await this.model.forwardWithLayerOutputs(inputIds, {
+                kvCache,
+                cachePosition,
+                collectLayerIndices,
+                collectAttentionLayers,
+            });
+
+        if (this.lmHeadWeight === null) {
+            throw new Error("LM head not initialized. Call initLMHead() after loading weights.");
+        }
+
+        const transposed = transpose(this.lmHeadWeight, 0, 1);
+
+        // 计算最终 logits
+        const logits = matmul(hiddenStates, transposed);
+        hiddenStates.dispose();
+
+        // 计算各层的 Logit Lens logits
+        const layerLogits = new Map<number, Tensor>();
+        if (layerHiddenStates) {
+            for (const [layerIdx, layerHidden] of layerHiddenStates) {
+                const normed = (await this.model.norm.call(layerHidden)) as Tensor;
+                const layerLogit = matmul(normed, transposed);
+                normed.dispose();
+                layerHidden.dispose();
+                layerLogits.set(layerIdx, layerLogit);
+            }
+        }
+
+        const seqLen = inputIds.shape[1];
+
+        return {
+            logits,
+            layerLogits,
+            layerAttentionWeights: layerAttentionWeights ?? new Map(),
+            newCachePosition: cachePosition + seqLen,
+        };
+    }
+
+    /**
      * 流式生成器 - 逐步生成 token
      *
      * 这是核心的可解释性 API，支持：

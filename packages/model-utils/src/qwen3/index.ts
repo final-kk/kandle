@@ -25,4 +25,6 @@ export {
     type SessionGenerationStep,
     type LogitLensConfig,
     type LayerPrediction,
+    type AttentionConfig,
+    type LayerAttentionData,
 } from "./generation-session";

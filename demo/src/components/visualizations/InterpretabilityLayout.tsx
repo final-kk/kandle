@@ -48,44 +48,24 @@ import type { GeneratedToken } from "../../types";
 // ============================================================================
 
 /**
- * 生成 Mock Attention 数据用于 UI 开发
- * 真实模型集成后将替换为实际的 attention 权重
+ * 从已生成 token 和 attention 数据创建 token 文本数组
+ * 用于 attention 可视化的 x/y 轴标签
+ *
+ * @param generatedTokens - 已生成的 token 列表（包含文本）
+ * @param keySeqLen - attention 数据中的 key 序列长度（总 token 数）
  */
-function generateMockAttention(prompt: string, generatedTokens: GeneratedToken[]): number[][] {
-    // 简化 token 列表
-    const promptTokens = prompt.split("").slice(0, 10);
-    const genTokens = generatedTokens.map((t) => t.text);
-    const totalTokens = promptTokens.length + genTokens.length;
+function buildTokenLabels(generatedTokens: GeneratedToken[], keySeqLen: number): string[] {
+    // generatedTokens 只包含生成的 token，不包含 prompt tokens
+    // keySeqLen = promptLength + generatedCount
+    const promptLength = keySeqLen - generatedTokens.length;
 
-    if (totalTokens === 0) return [];
+    // 为 prompt tokens 创建占位符标签
+    const promptLabels = Array.from({ length: promptLength }, (_, i) => `[${i}]`);
 
-    // 生成随机 attention 矩阵
-    const weights: number[][] = [];
+    // 使用真实的生成 token 文本
+    const genLabels = generatedTokens.map((t) => t.text);
 
-    for (let i = 0; i < totalTokens; i++) {
-        const row: number[] = [];
-        let sum = 0;
-
-        for (let j = 0; j < totalTokens; j++) {
-            // 只关注之前的 token (causal mask)
-            if (j > i) {
-                row.push(0);
-            } else {
-                // 距离越近，attention 越高
-                const distance = i - j;
-                const base = Math.exp(-distance * 0.3);
-                const noise = Math.random() * 0.2;
-                const weight = base + noise;
-                row.push(weight);
-                sum += weight;
-            }
-        }
-
-        // 归一化
-        weights.push(row.map((w) => (sum > 0 ? w / sum : 0)));
-    }
-
-    return weights;
+    return [...promptLabels, ...genLabels];
 }
 
 // ============================================================================
@@ -210,6 +190,19 @@ export function InterpretabilityLayout({
                                 {modelName} loaded
                             </span>
                         )}
+
+                        <a
+                            href="https://github.com/final-kk/kandle"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-400 hover:text-white transition-colors"
+                            title="View on GitHub"
+                        >
+                            <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+                            </svg>
+                        </a>
+
                         <div
                             className={`w-3 h-3 rounded-full ${
                                 webgpuAvailable ? "bg-cyber-green animate-pulse" : "bg-red-500"
@@ -348,23 +341,16 @@ export function InterpretabilityLayout({
                             maxHeight={300}
                         />
 
-                        {/* Attention Visualization - 始终显示 */}
+                        {/* Attention Visualization - 使用真实数据 */}
                         <AttentionLinks
-                            data={
-                                generator.generatedTokens.length > 0
-                                    ? {
-                                          // 暂时使用 mock 数据，等待真实模型集成
-                                          weights: generateMockAttention(
-                                              generator.prompt,
-                                              generator.generatedTokens
-                                          ),
-                                          layerIndex: 0,
-                                          tokens: [
-                                              ...generator.prompt.split("").slice(0, 10),
-                                              ...generator.generatedTokens.map((t) => t.text),
-                                          ],
-                                      }
-                                    : null
+                            data={generator.currentAttention ?? null}
+                            tokens={
+                                generator.currentAttention && generator.currentAttention.length > 0
+                                    ? buildTokenLabels(
+                                          generator.generatedTokens,
+                                          generator.currentAttention[0].keySeqLen
+                                      )
+                                    : []
                             }
                             numLayers={28}
                             maxHeight={280}

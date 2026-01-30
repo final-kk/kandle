@@ -16,7 +16,9 @@ import type {
     GenerationStep as WorkerGenerationStep,
     TokenCandidate as WorkerTokenCandidate,
     LogitLensConfig,
+    AttentionConfig,
     LayerPrediction as WorkerLayerPrediction,
+    LayerAttentionData as WorkerLayerAttentionData,
 } from "../workers/message-types";
 import type {
     GenerationStep,
@@ -25,6 +27,7 @@ import type {
     GeneratorStatus,
     TokenCandidate,
     LayerPrediction,
+    LayerAttentionData,
 } from "../types";
 import { DEFAULT_SAMPLER_CONFIG } from "../types";
 
@@ -54,8 +57,14 @@ export interface UseGeneratorState {
     /** Logit Lens 配置 */
     logitLensConfig: LogitLensConfig;
 
+    /** Attention 可视化配置 */
+    attentionConfig: AttentionConfig;
+
     /** 当前步骤的 Logit Lens 预测结果 */
     currentLogitLens: LayerPrediction[] | null;
+
+    /** 当前步骤的 Attention 数据 */
+    currentAttention: LayerAttentionData[] | null;
 
     /** 错误信息 */
     error: string | null;
@@ -97,6 +106,9 @@ export interface UseGeneratorActions {
 
     /** 更新 Logit Lens 配置 */
     setLogitLensConfig: (config: Partial<LogitLensConfig>) => void;
+
+    /** 更新 Attention 配置 */
+    setAttentionConfig: (config: Partial<AttentionConfig>) => void;
 }
 
 export type UseGeneratorReturn = UseGeneratorState & UseGeneratorActions;
@@ -117,16 +129,24 @@ export interface UseGeneratorOptions {
 
     /** 初始 Logit Lens 配置 */
     initialLogitLensConfig?: LogitLensConfig;
+
+    /** 初始 Attention 配置 */
+    initialAttentionConfig?: AttentionConfig;
 }
 
 // ============================================================================
-// Default Logit Lens Config
+// Default Configs
 // ============================================================================
 
 const DEFAULT_LOGIT_LENS_CONFIG: LogitLensConfig = {
     enabled: true,
     layerIndices: [0, 5, 11, 16, 22, 27], // 稀疏采样 6 层
     topK: 3,
+};
+
+const DEFAULT_ATTENTION_CONFIG: AttentionConfig = {
+    enabled: true,
+    layerIndices: [0, 14, 27], // 捕获 3 层：开头、中间、结尾
 };
 
 // ============================================================================
@@ -228,6 +248,18 @@ function convertWorkerStep(workerStep: WorkerGenerationStep): GenerationStep {
         }));
     }
 
+    // 转换 Attention 数据 (直接透传 Float32Array)
+    let attentionData: LayerAttentionData[] | undefined;
+    if (workerStep.attentionData && workerStep.attentionData.length > 0) {
+        attentionData = workerStep.attentionData.map((layer: WorkerLayerAttentionData) => ({
+            layerIndex: layer.layerIndex,
+            weights: layer.weights,
+            numHeads: layer.numHeads,
+            querySeqLen: layer.querySeqLen,
+            keySeqLen: layer.keySeqLen,
+        }));
+    }
+
     return {
         tokenId: workerStep.tokenId,
         tokenText: workerStep.tokenText,
@@ -238,6 +270,7 @@ function convertWorkerStep(workerStep: WorkerGenerationStep): GenerationStep {
         cachePosition: workerStep.cachePosition,
         generatedCount: workerStep.generatedCount,
         logitLens,
+        attentionData,
     };
 }
 
@@ -259,6 +292,7 @@ export function useGenerator(options: UseGeneratorOptions | boolean = true): Use
         workerManager = null,
         eosTokenIds = [151643, 151645], // Qwen3 EOS tokens
         initialLogitLensConfig,
+        initialAttentionConfig,
     } = opts;
 
     // 状态
@@ -270,7 +304,11 @@ export function useGenerator(options: UseGeneratorOptions | boolean = true): Use
     const [logitLensConfig, setLogitLensConfigState] = useState<LogitLensConfig>(
         initialLogitLensConfig ?? DEFAULT_LOGIT_LENS_CONFIG
     );
+    const [attentionConfig, setAttentionConfigState] = useState<AttentionConfig>(
+        initialAttentionConfig ?? DEFAULT_ATTENTION_CONFIG
+    );
     const [currentLogitLens, setCurrentLogitLens] = useState<LayerPrediction[] | null>(null);
+    const [currentAttention, setCurrentAttention] = useState<LayerAttentionData[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isStepLoading, setIsStepLoading] = useState<boolean>(false);
     const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(false);
@@ -298,6 +336,10 @@ export function useGenerator(options: UseGeneratorOptions | boolean = true): Use
             // 更新 Logit Lens 数据
             if (uiStep.logitLens) {
                 setCurrentLogitLens(uiStep.logitLens);
+            }
+            // 更新 Attention 数据
+            if (uiStep.attentionData) {
+                setCurrentAttention(uiStep.attentionData);
             }
             setIsStepLoading(false);
             stepIndexRef.current++;
@@ -331,6 +373,10 @@ export function useGenerator(options: UseGeneratorOptions | boolean = true): Use
             if (uiStep.logitLens) {
                 setCurrentLogitLens(uiStep.logitLens);
             }
+            // 更新 Attention 数据
+            if (uiStep.attentionData) {
+                setCurrentAttention(uiStep.attentionData);
+            }
             setIsStepLoading(false);
             // generatedTokens 在 undo action 中已更新
         });
@@ -361,6 +407,7 @@ export function useGenerator(options: UseGeneratorOptions | boolean = true): Use
         setPrompt("");
         setError(null);
         setCurrentLogitLens(null);
+        setCurrentAttention(null);
         autoPlayRef.current = false;
         stepIndexRef.current = 0;
     }, []);
@@ -390,6 +437,8 @@ export function useGenerator(options: UseGeneratorOptions | boolean = true): Use
                         eosTokenIds,
                         // Logit Lens 配置
                         logitLens: logitLensConfig.enabled ? logitLensConfig : undefined,
+                        // Attention 配置
+                        attention: attentionConfig.enabled ? attentionConfig : undefined,
                     });
                     // Worker 会异步发送 generationStep 事件
                 } catch (e) {
@@ -403,7 +452,7 @@ export function useGenerator(options: UseGeneratorOptions | boolean = true): Use
                 setStatus("error");
             }
         },
-        [useMock, workerManager, samplerConfig, logitLensConfig, eosTokenIds, reset]
+        [useMock, workerManager, samplerConfig, logitLensConfig, attentionConfig, eosTokenIds, reset]
     );
 
     const step = useCallback(
@@ -574,6 +623,10 @@ export function useGenerator(options: UseGeneratorOptions | boolean = true): Use
         setLogitLensConfigState((prev) => ({ ...prev, ...config }));
     }, []);
 
+    const setAttentionConfig = useCallback((config: Partial<AttentionConfig>) => {
+        setAttentionConfigState((prev) => ({ ...prev, ...config }));
+    }, []);
+
     // 计算 canUndo
     const canUndo = generatedTokens.length > 0 && !isAutoPlaying && !isStepLoading;
 
@@ -587,6 +640,8 @@ export function useGenerator(options: UseGeneratorOptions | boolean = true): Use
         samplerConfig,
         logitLensConfig,
         currentLogitLens,
+        attentionConfig,
+        currentAttention,
         error,
         isStepLoading,
         isAutoPlaying,
@@ -602,5 +657,6 @@ export function useGenerator(options: UseGeneratorOptions | boolean = true): Use
         reset,
         setSamplerConfig,
         setLogitLensConfig,
+        setAttentionConfig,
     };
 }

@@ -28,6 +28,8 @@ export interface GenerationStep {
     generatedCount: number;
     /** Logit Lens 各层预测结果（可选） */
     logitLens?: LayerPrediction[];
+    /** 各层 Attention Weights 数据（可选） */
+    attentionData?: LayerAttentionData[];
 }
 
 /**
@@ -38,6 +40,25 @@ export interface LayerPrediction {
     layerIndex: number;
     /** Top-K 候选列表 */
     topK: TokenCandidate[];
+}
+
+/**
+ * 单层的 Attention Weights 数据
+ */
+export interface LayerAttentionData {
+    /** 层索引 */
+    layerIndex: number;
+    /**
+     * Attention weights 数据 (Float32Array)
+     * 形状: [numHeads, querySeqLen, keySeqLen]
+     */
+    weights: Float32Array;
+    /** 头数量 */
+    numHeads: number;
+    /** Query 序列长度 */
+    querySeqLen: number;
+    /** Key 序列长度 */
+    keySeqLen: number;
 }
 
 /**

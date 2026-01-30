@@ -19,6 +19,7 @@ import type {
     TokenCandidate,
     LoadModelFromBufferPayload,
     LayerPrediction,
+    LayerAttentionData,
 } from "./message-types";
 
 // ============================================================================
@@ -278,6 +279,7 @@ export class ModelHandler {
                 displayTopK: config.displayTopK,
                 maxNewTokens: config.maxNewTokens,
                 logitLens: config.logitLens,
+                attention: config.attention,
             } as any
         );
 
@@ -426,6 +428,31 @@ export class ModelHandler {
             );
         }
 
+        // 处理 Attention 数据
+        // 直接透传 Float32Array，利用 Transferable 机制
+        let attentionDataResults: LayerAttentionData[] | undefined;
+        const attentionData = (
+            sessionStep as {
+                attentionData?: Array<{
+                    layerIndex: number;
+                    weights: Float32Array;
+                    numHeads: number;
+                    querySeqLen: number;
+                    keySeqLen: number;
+                }>;
+            }
+        ).attentionData;
+
+        if (attentionData && attentionData.length > 0) {
+            attentionDataResults = attentionData.map((layer) => ({
+                layerIndex: layer.layerIndex,
+                weights: layer.weights, // 直接透传 Float32Array
+                numHeads: layer.numHeads,
+                querySeqLen: layer.querySeqLen,
+                keySeqLen: layer.keySeqLen,
+            }));
+        }
+
         return {
             tokenId: sessionStep.tokenId,
             tokenText,
@@ -437,6 +464,7 @@ export class ModelHandler {
             generatedCount: sessionStep.generatedCount,
             canUndo: sessionStep.canUndo,
             logitLens: logitLensResults,
+            attentionData: attentionDataResults,
         };
     }
 }

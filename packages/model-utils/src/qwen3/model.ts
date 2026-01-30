@@ -117,10 +117,23 @@ export interface Qwen3ModelForwardOptions {
      * @example [0, 7, 14, 21, 27] // 收集第 0, 7, 14, 21, 27 层的输出
      */
     collectLayerIndices?: number[];
+
+    /**
+     * Attention 可视化: 需要捕获 attention weights 的层索引
+     *
+     * 如果提供，将在这些层捕获 attention weights
+     * 形状: [batch, numHeads, querySeqLen, keySeqLen]
+     *
+     * 警告：开启此选项会使用 naive attention 实现（非 FlashAttention），
+     * 会显著降低性能。仅用于可视化/调试目的。
+     *
+     * @example [0, 14, 27] // 捕获第 0, 14, 27 层的 attention
+     */
+    collectAttentionLayers?: number[];
 }
 
 /**
- * Forward 结果（带 Logit Lens）
+ * Forward 结果（带 Logit Lens 和 Attention）
  */
 export interface Qwen3ModelForwardResult {
     /** 最终 hidden states (经过 final norm) */
@@ -131,6 +144,12 @@ export interface Qwen3ModelForwardResult {
      * key 为层索引
      */
     layerHiddenStates?: Map<number, Tensor>;
+
+    /**
+     * 各层的 attention weights
+     * key 为层索引，value 形状: [batch, numHeads, querySeqLen, keySeqLen]
+     */
+    layerAttentionWeights?: Map<number, Tensor>;
 }
 
 // ============================================================================
@@ -253,11 +272,14 @@ export class Qwen3Model extends nn.Module {
             kvCache,
             cachePosition = 0,
             collectLayerIndices,
+            collectAttentionLayers,
         } = options ?? {};
 
         const seqLen = inputIds.shape[1];
-        const collectSet = collectLayerIndices ? new Set(collectLayerIndices) : null;
-        const layerHiddenStates = collectSet ? new Map<number, Tensor>() : undefined;
+        const collectHiddenSet = collectLayerIndices ? new Set(collectLayerIndices) : null;
+        const collectAttentionSet = collectAttentionLayers ? new Set(collectAttentionLayers) : null;
+        const layerHiddenStates = collectHiddenSet ? new Map<number, Tensor>() : undefined;
+        const layerAttentionWeights = collectAttentionSet ? new Map<number, Tensor>() : undefined;
 
         // Token Embedding
         let hiddenStates = (await this.embed_tokens.call(inputIds)) as Tensor;
@@ -285,19 +307,30 @@ export class Qwen3Model extends nn.Module {
                 };
             }
 
+            // 判断当前层是否需要捕获 attention
+            const shouldCaptureAttention = collectAttentionSet?.has(layerIdx) ?? false;
+
             hiddenStates = (await decoderLayer.call(hiddenStates, {
                 positionEmbeddings,
                 attnMask,
                 isCausal,
                 kvCacheUpdateFn,
                 cachePosition,
+                captureAttentionWeights: shouldCaptureAttention,
             })) as Tensor;
 
-            // 如果需要收集该层的输出，保存一份副本
-            if (collectSet && collectSet.has(layerIdx) && layerHiddenStates) {
-                // 对于 Logit Lens，我们需要保存该层输出的副本
-                // 因为 hiddenStates 会在后续层被覆盖
+            // 收集 hidden states（用于 Logit Lens）
+            if (collectHiddenSet?.has(layerIdx) && layerHiddenStates) {
                 layerHiddenStates.set(layerIdx, hiddenStates.clone());
+            }
+
+            // 收集 attention weights
+            if (shouldCaptureAttention && layerAttentionWeights) {
+                const attnWeights = decoderLayer.self_attn.lastAttentionWeights;
+                if (attnWeights) {
+                    // 克隆以获取独立副本
+                    layerAttentionWeights.set(layerIdx, attnWeights.clone());
+                }
             }
 
             layerIdx++;
@@ -309,6 +342,7 @@ export class Qwen3Model extends nn.Module {
         return {
             hiddenStates,
             layerHiddenStates,
+            layerAttentionWeights,
         };
     }
 
